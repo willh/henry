@@ -26,4 +26,5 @@ If you are reusing the lambda by itself, the function depends on an environment 
 
 ### Further Development
 
-Changing the sns topic subscription from email to a HTTP endpoint may make it relatively easy to push messages to a Slack channel when someone creates/modifies a bucket with public permissions.
+- Reading the CloudTrail event details and extracting the user ID of the person/role of the service that set the S3 bucket to public and including that in the notification message.
+- Changing the sns topic subscription from email to a HTTP endpoint may make it relatively easy to push messages to a Slack channel when someone creates/modifies a bucket with public permissions.
