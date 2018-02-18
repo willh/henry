@@ -6,7 +6,7 @@ provider "aws" {
 # cloudwatch logging needs a role and policy to pick up cloudtrail trail
 
 resource "aws_cloudtrail" "cloudtrail_log" {
-  name                          = "zxcvbnm-cloudtrail-tf"
+  name                          = "cloudtrail-log-tf"
   s3_bucket_name                = "${aws_s3_bucket.logbucket.id}"
   s3_key_prefix                 = "ctlogs"
   include_global_service_events = false
@@ -15,9 +15,13 @@ resource "aws_cloudtrail" "cloudtrail_log" {
 }
 
 resource "aws_s3_bucket" "logbucket" {
-  bucket        = "zxcvbnm-cloudtrail-logs-tf"
+  bucket        = "${var.cloudtrail_s3_bucket_name}"
   force_destroy = true
-  policy        = <<POLICY
+}
+
+resource "aws_s3_bucket_policy" "logbucket_policy" {
+  bucket = "${aws_s3_bucket.logbucket.id}"
+  policy = <<POLICY
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -28,7 +32,7 @@ resource "aws_s3_bucket" "logbucket" {
               "Service": "cloudtrail.amazonaws.com"
             },
             "Action": "s3:GetBucketAcl",
-            "Resource": "arn:aws:s3:::zxcvbnm-cloudtrail-logs-tf"
+            "Resource": "${aws_s3_bucket.logbucket.arn}"
         },
         {
             "Sid": "AWSCloudTrailWrite",
@@ -37,7 +41,7 @@ resource "aws_s3_bucket" "logbucket" {
               "Service": "cloudtrail.amazonaws.com"
             },
             "Action": "s3:PutObject",
-            "Resource": "arn:aws:s3:::zxcvbnm-cloudtrail-logs-tf/*",
+            "Resource": "${aws_s3_bucket.logbucket.arn}/*",
             "Condition": {
                 "StringEquals": {
                     "s3:x-amz-acl": "bucket-owner-full-control"

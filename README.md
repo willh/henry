@@ -12,9 +12,13 @@ This is intended to help ensure you are aware when an S3 bucket is created or mo
 
 ### Deployment
 
-Included is a terraform script that will create all of the AWS resources necessary to immediately use this in your Amazon account, from CloudTrail log to SNS topic. A variable is prompted at template apply for the target email address.
+Included is a terraform script that will create all of the AWS resources necessary to immediately use this in your Amazon account, from CloudTrail log to SNS topic.
 
 Before running the terraform script you'll need to package the lambda file: `zip lambda.zip index.js`
+
+Two variables are prompted at template apply:
+- `alert_email_address` for the target email address
+- `cloudtrail_s3_bucket_name` for the cloudtrail log bucket name (must be globally unique)
 
 ### Lambda Configuration
 
