@@ -1,10 +1,25 @@
-# Open S3 Bucket Alert
+# Henry
+_There's a hole in the bucket, dear Liza, dear Liza_
+## Alert on Open S3 Buckets
 
 This NodeJS lambda function is triggered by a Cloudwatch Event rule, processing CloudTrail API logs to find S3 bucket permissions changes, and sends a notification via SNS (pronounced 'snooze', fact) if the bucket has public read or public write access.
 
 This is intended to help ensure you are aware when an S3 bucket is created or modified with public access (which could be desirable in some use cases). It will not prevent the bucket from being created.
 
+### Overview
 
-### Configuration
+![Process flow from S3 permission change to email alert](alert_open_s3_buckets.png)
 
-This lambda function depends on an environment variable called `snsTopicArn` which must be populated with the fully qualified ARN for your SNS topic.
+### Deployment
+
+Included is a terraform script that will create all of the AWS resources necessary to immediately use this in your Amazon account, from CloudTrail log to SNS topic. A variable is prompted at template apply for the target email address.
+
+Before running the terraform script you'll need to package the lambda file: `zip lambda.zip index.js`
+
+### Lambda Configuration
+
+If you are reusing the lambda by itself, the function depends on an environment variable called `snsTopicArn` which must be populated with the fully qualified ARN for your SNS topic.
+
+### Further Development
+
+Changing the sns topic subscription from email to a HTTP endpoint may make it relatively easy to push messages to a Slack channel when someone creates/modifies a bucket with public permissions.

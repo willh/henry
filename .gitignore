@@ -1,0 +1,8 @@
+*.DS_Store
+.npm
+node_modules/
+*.tfstate
+*.tfstate.backup
+.terraform/
+lambda.zip
+
