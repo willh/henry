@@ -10,6 +10,14 @@ This is intended to help ensure you are aware when an S3 bucket is created or mo
 
 ![Process flow from S3 permission change to email alert](alert_open_s3_buckets.png)
 
+### Pre-requisites
+
+- Terraform
+- AWS credentials in `~/.aws`
+- AWS CLI tools set up (to shell out to create sns email subscription)
+
+Of course, if you just want to use the event parsing & notification lambda then just pluck out `index.js`
+
 ### Deployment
 
 Included is a terraform script that will create all of the AWS resources necessary to immediately use this in your Amazon account, from CloudTrail log to SNS topic.
