@@ -12,6 +12,9 @@ resource "aws_cloudtrail" "cloudtrail_log" {
   include_global_service_events = false
   cloud_watch_logs_role_arn     = "${aws_iam_role.logging_role.arn}"
   cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.log_group.arn}"
+  depends_on = [
+    "aws_s3_bucket_policy.logbucket_policy"
+  ]
 }
 
 resource "aws_s3_bucket" "logbucket" {
@@ -201,7 +204,8 @@ resource "aws_cloudwatch_event_rule" "lambda_trigger_rule" {
       "s3.amazonaws.com"
     ],
     "eventName": [
-      "PutBucketAcl"
+      "PutBucketAcl",
+      "CreateBucket"
     ]
   }
 }
