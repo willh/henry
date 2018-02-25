@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: "Serverless Application Model template for Henry Open S3 Buckets Alert"
+
+Parameters:
+  S3LogBucketName:
+    Type: "String"
+    Description: "Name for S3 bucket for cloudtrail logs - must be globally unique"
+    ConstraintDescription: "[a-z0-9][a-z0-9-]{1,61}[a-z0-9]"
+  AlertEmailAddress:
+    Type: "String"
+    Description: "Email address to which the permission alerts will be sent by SNS"
+
+Resources:
+
+  # S3 bucket for Cloudtrail logs
+  logbucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+        BucketName: !Ref S3LogBucketName
+    DeletionPolicy: "Retain"
+
+  # S3 bucket policy for Cloudtrail logging
+  logbucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties: 
+      Bucket: !Ref logbucket
+      PolicyDocument:
+        Statement:
+          -
+            Action: "s3:GetBucketAcl"
+            Effect:  "Allow"
+            Resource: !Sub "arn:aws:s3:::${logbucket}"
+            Principal:  "*"
+          -
+            Action: "s3:PutObject"
+            Effect:  "Allow"
+            Resource: !Sub "arn:aws:s3:::${logbucket}/*"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+
+  # Cloudtrail log
+  cloudtrailLog:
+    Type: "AWS::CloudTrail::Trail"
+    Properties:
+      IsLogging: true
+      TrailName: "cloudtrail-log-sam"
+      S3BucketName: !Ref logbucket
+      S3KeyPrefix: "ctlogs"
+      IncludeGlobalServiceEvents: false
+      CloudWatchLogsLogGroupArn: !GetAtt cloudwatchLogGroup.Arn
+      CloudWatchLogsRoleArn: !GetAtt loggingRole.Arn
+    DependsOn: logbucketPolicy
+
+  # Cloudwatch log group
+  cloudwatchLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: "cloudwatch-log-group-sam"
+
+  # IAM role for Cloudwatch logging, and logging policy
+  loggingRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "cloudwatch-logging-role-sam"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+      Policies:
+        - PolicyName: "createLogStreamCWPolicy"
+          PolicyDocument:
+            Statement:
+              - Action: "logs:CreateLogStream"
+                Effect: "Allow"
+                Resource: !GetAtt cloudwatchLogGroup.Arn
+        - PolicyName: "putLogEventsCWPolicy"
+          PolicyDocument:
+            Statement:
+              - Action: "logs:PutLogEvents"
+                Effect: "Allow"
+                Resource: !GetAtt cloudwatchLogGroup.Arn
+
+  # SNS topic for alerts
+  bucketAlertsSNSTopic: 
+    Type: "AWS::SNS::Topic"
+    Properties: 
+      TopicName: "s3-bucket-public-access-alert-sam"
+      Subscription:
+        - Endpoint: !Ref AlertEmailAddress
+          Protocol: "email"
+
+  # IAM role for lambda execution and policy for lambda execution & SNS publish
+  lambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "bucket-alert-lambda-execution-role-sam"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+      Policies:
+        - PolicyName: "createLogPolicy"
+          PolicyDocument:
+            Statement:
+              -
+                Action: "logs:CreateLogStream"
+                Effect: "Allow"
+                Resource: "arn:aws:logs:*:*:*"
+        - PolicyName: "putLogEventsPolicy"
+          PolicyDocument:
+            Statement:
+              -
+                Action: "logs:PutLogEvents"
+                Effect: "Allow"
+                Resource: "arn:aws:logs:*:*:*"
+        - PolicyName: "createLogGroupPolicy"
+          PolicyDocument:
+            Statement:
+              -
+                Action: "logs:CreateLogGroup"
+                Effect: "Allow"
+                Resource: "arn:aws:logs:*:*:*"
+        - PolicyName: "publishToSnsPolicy"
+          PolicyDocument:
+            Statement:
+              -
+                Action: "sns:Publish"
+                Effect: "Allow"
+                Resource: !Ref bucketAlertsSNSTopic
+
+  # Lambda function definition with environment variable for SNS topic ARN
+  bucketAlertLambda:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Handler: "index.handler"
+      Runtime: "nodejs6.10"
+      Role: !GetAtt lambdaExecutionRole.Arn
+      Description: "parses cloudtrail logs from cloudwatch events and alerts sns on public s3 buckets"
+      # CodeUri can be passed a dir or file when cloudformation package is run to set up lambda
+      # otherwise it needs to be given an S3 URI to location your lambda deploy package is uploaded
+      CodeUri: "index.js"
+      MemorySize: 128
+      Timeout: 3
+      Environment:
+        Variables:
+          snsTopicArn: !Ref bucketAlertsSNSTopic
+
+  # Cloudwatch event rule matching PutBucketAcl and CreateBucket S3 events
+  cloudwatchEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: "cloudwatch-lambda-putbucketacl-rule-sam"
+      EventPattern: {
+        "source": [
+          "aws.s3"
+        ],
+        "detail-type": [
+          "AWS API Call via CloudTrail"
+        ],
+        "detail": {
+          "eventSource": [
+            "s3.amazonaws.com"
+          ],
+          "eventName": [
+            "PutBucketAcl",
+            "CreateBucket"
+          ]
+        }
+      }
+      State: "ENABLED"
+      Targets:
+        - 
+          Arn: !GetAtt bucketAlertLambda.Arn
+          Id: "cloudwatch-event-rule-target-sam"
+    DependsOn: bucketAlertLambda
+
+  # Lambda permissions to allow execution from Cloudwatch event rule
+  cloudwatchEventLambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    Properties: 
+      FunctionName: !Ref bucketAlertLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt cloudwatchEventRule.Arn
