@@ -1,5 +1,6 @@
 const AWS = require("aws-sdk");
 const allUsersUri = "http://acs.amazonaws.com/groups/global/AllUsers";
+const authenticatedUsersUri = "http://acs.amazonaws.com/groups/global/AuthenticatedUsers";
 const snoozeTopic = process.env.snsTopicArn;
 
 exports.handler = (event, context) => {
@@ -21,7 +22,7 @@ exports.handler = (event, context) => {
         // Grant[0] is always owner, so we only need to check further if we have more than 1 grant
         if (grants.length > 1) {
             for (const grant of grants) {
-                if (grant.Grantee.URI && grant.Grantee.URI == allUsersUri) {
+                if (grant.Grantee.URI && (grant.Grantee.URI == allUsersUri || grant.Grantee.URI == authenticatedUsersUri) {
                     if (grant.Permission == "READ") {
                         publicPermissions.push("read");
                     } else {
