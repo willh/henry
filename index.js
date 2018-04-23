@@ -22,7 +22,7 @@ exports.handler = (event, context) => {
         // Grant[0] is always owner, so we only need to check further if we have more than 1 grant
         if (grants.length > 1) {
             for (const grant of grants) {
-                if (grant.Grantee.URI && (grant.Grantee.URI == allUsersUri || grant.Grantee.URI == authenticatedUsersUri) {
+                if (grant.Grantee.URI && (grant.Grantee.URI == allUsersUri || grant.Grantee.URI == authenticatedUsersUri)) {
                     if (grant.Permission == "READ") {
                         publicPermissions.push("read");
                     } else {
